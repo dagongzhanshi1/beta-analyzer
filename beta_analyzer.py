@@ -649,6 +649,10 @@ def main():
 
     # 生成HTML报告
     if not args.no_html:
+        # 时间戳：每次运行独立命名
+        timestamp = datetime.now().strftime("_%Y%m%d_%H%M%S")
+        batch_tag = timestamp
+
         combined_scatter_path = None
         combined_rolling_path = None
 
@@ -659,7 +663,7 @@ def main():
                 if r.get("roll_beta") is not None:
                     all_rolling.append((r["name"], r["roll_beta"]))
             if len(all_rolling) >= 2:
-                combined_rolling_path = os.path.join(OUTPUT_DIR, "combined_rolling_beta.png")
+                combined_rolling_path = os.path.join(OUTPUT_DIR, f"combined_rolling_beta{batch_tag}.png")
                 plot_combined_rolling(all_rolling, bench_name, bench_code, args.rolling_window, combined_rolling_path)
                 print(f"  📈 合并β走势图 → {combined_rolling_path}")
 
@@ -669,29 +673,35 @@ def main():
                 if r.get("data_1y") is not None and r.get("beta_1y") is not None:
                     all_data.append((r["name"], r["code"], r["beta_1y"], r["data_1y"]))
             if len(all_data) >= 2:
-                combined_scatter_path = os.path.join(OUTPUT_DIR, "combined_scatter.png")
+                combined_scatter_path = os.path.join(OUTPUT_DIR, f"combined_scatter{batch_tag}.png")
                 plot_combined_scatter(all_data, bench_name, bench_code, combined_scatter_path)
                 print(f"  📈 合并散点图 → {combined_scatter_path}")
 
         # 单只股票 → 个股散点图 + 个股β走势图
         if len(results) == 1:
             r = results[0]
+            code_safe = r['code'].replace('.', '_')
             if r.get("data_1y") is not None and r.get("beta_1y") is not None:
-                code_safe = r['code'].replace('.', '_')
-                scatter_path = os.path.join(OUTPUT_DIR, f"{code_safe}_scatter_1y.png")
+                scatter_path = os.path.join(OUTPUT_DIR, f"{code_safe}_scatter_1y{batch_tag}.png")
                 plot_beta_scatter(r["data_1y"], r["beta_1y"], r["name"], r["code"], bench_name, "近1年", scatter_path)
                 combined_scatter_path = scatter_path
             if not args.no_rolling and r.get("roll_beta") is not None:
-                code_safe = r['code'].replace('.', '_')
-                rolling_path = os.path.join(OUTPUT_DIR, f"{code_safe}_rolling_beta.png")
+                rolling_path = os.path.join(OUTPUT_DIR, f"{code_safe}_rolling_beta{batch_tag}.png")
                 plot_rolling_beta(r["roll_beta"], r["name"], r["code"], bench_name, args.rolling_window, rolling_path)
                 combined_rolling_path = rolling_path
 
-        html_path = os.path.join(OUTPUT_DIR, "beta_report.html")
-        generate_html_report(results, bench_name, bench_code, html_path,
+        # HTML报告：带时间戳 + 同时保留一份 latest 覆盖（方便快速打开）
+        html_timestamp = os.path.join(OUTPUT_DIR, f"beta_report{batch_tag}.html")
+        html_latest = os.path.join(OUTPUT_DIR, "beta_report.html")
+        generate_html_report(results, bench_name, bench_code, html_timestamp,
                              combined_scatter_path=combined_scatter_path,
                              combined_rolling_path=combined_rolling_path)
-        print(f"\n📄 HTML报告 → {html_path}")
+        print(f"📄 HTML报告 → {html_timestamp}")
+        # 也生成一份 latest 覆盖（始终指向最近一次运行）
+        generate_html_report(results, bench_name, bench_code, html_latest,
+                             combined_scatter_path=combined_scatter_path,
+                             combined_rolling_path=combined_rolling_path)
+        print(f"📄 最新报告 → {html_latest}")
 
 
 if __name__ == "__main__":
